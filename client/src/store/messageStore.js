@@ -248,16 +248,25 @@ export const messAuth = create((set, get) => ({
     // Accept Message Request
     acceptMessageRequest: async (requestID) => {
         try {
-            await axios.post("http://localhost:4000/api/v1/request/accept", { receiverId: requestID });
+            const response = await axios.post(
+                "http://localhost:4000/api/v1/request/accept",
+                { receiverId: requestID }
+            );
+
+            const updatedAcceptedRequests = response.data.acceptedRequests;
+
             set((state) => ({
-                acceptedRequests: [...state.acceptedRequests, requestID],
-            }))
+                acceptedRequests: updatedAcceptedRequests,
+            }));
+
             get().getMessageRequests();
 
         } catch (error) {
-            console.error("Error accepting message request:", error.response?.data?.error || error.message);
+            console.error("Error accepting message request:", error.response?.data?.message || error.message);
         }
     },
+
+
 
     // Reject Message Request
     rejectMessageRequest: async (requestID) => {
@@ -286,5 +295,29 @@ export const messAuth = create((set, get) => ({
     // Getter for DM status (added this for clarity)
     getDmStatus: () => {
         return get().dmEnabled;
+    },
+    listenForRequestAccepted: () => {
+        const socket = useAuthStore.getState().socket;
+        if (!socket) return;
+
+        socket.off("requestAccepted");
+
+        socket.on("requestAccepted", ({ senderId }) => {
+            console.log(`User ${senderId} accepted your message request!`);
+
+
+            set((state) => ({
+                acceptedRequests: [...state.acceptedRequests, senderId]
+            }));
+
+            get().getMessageRequests();
+
+            // Optional: If the accepted user is currently selected, you might want to auto-load messages
+            const { selectedUser } = get();
+            if (selectedUser && selectedUser._id === senderId) {
+                get().getmessages(senderId);
+            }
+        });
     }
+
 }));

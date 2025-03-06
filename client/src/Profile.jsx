@@ -4,7 +4,7 @@ import { messAuth } from './store/messageStore.js';
 
 function Profile() {
     const { authUser, isUpdatingProfile, updateProfile, logout } = useAuthStore();
-    const { toggleDM, messageRequests, getMessageRequests, rejectMessageRequest, acceptMessageRequest } = messAuth();
+    const { toggleDM, messageRequests, getMessageRequests, rejectMessageRequest, acceptMessageRequest,acceptedRequests,getAcceptedRequests } = messAuth();
     const [selectedImage, setSelectedImage] = useState(null);
     const [isDmEnabled, setIsDmEnabled] = useState(!authUser?.dmOff);
     const [isToggling, setIsToggling] = useState(false);
@@ -18,6 +18,7 @@ function Profile() {
             setIsDmEnabled(!authUser.dmOff);
         }
         getMessageRequests()
+        getAcceptedRequests();
 
     }, [authUser]);
 
@@ -51,11 +52,11 @@ function Profile() {
         setIsToggling(true);
 
         try {
-            const updatedDmEnabled = !isDmEnabled; // Toggle state before sending request
+            const updatedDmEnabled = !isDmEnabled;
 
-            await toggleDM(updatedDmEnabled); // Pass new state to backend
+            await toggleDM(updatedDmEnabled);
 
-            setIsDmEnabled(updatedDmEnabled); // Update UI state
+            setIsDmEnabled(updatedDmEnabled);
 
         } catch (error) {
             console.error("Failed to toggle DM", error);
@@ -68,12 +69,20 @@ function Profile() {
 
     const handleAccept = async (userID) => {
         await acceptMessageRequest(userID)
+        alert("user req accepted succesfully")
+        getMessageRequests()
 
 
     }
     const handleReject = async (userID) => {
         await rejectMessageRequest(userID)
+        alert("user req rejected succesfully")
+        getMessageRequests()
+
     }
+
+    
+    console.log("accepted users are ",acceptedRequests);
 
 
     return (

@@ -34,6 +34,10 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }],
+    acceptedRequests: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
 
     // Blocked users)
     blockedUsers: [{
@@ -46,8 +50,8 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
- 
-    
+
+
     // Message Requests (users who sent requests)
     messageRequests: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -60,7 +64,7 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next;
-    this.password = await bcrypt.hash(this.password, 10); 
+    this.password = await bcrypt.hash(this.password, 10);
     next();
 });
 
@@ -70,7 +74,7 @@ userSchema.methods = {
         return await bcrypt.compare(currentPassword, this.password);
     },
     getJWTtoken: function () {
-        return JWT.sign({ _id: this._id}, config.JWT_SECRET, {
+        return JWT.sign({ _id: this._id }, config.JWT_SECRET, {
             expiresIn: config.JWT_EXPIRY,
         });
     },
