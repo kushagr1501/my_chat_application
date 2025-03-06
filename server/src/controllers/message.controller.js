@@ -228,6 +228,7 @@ import Message from "../models/message.model.js";
 import User from "../models/user.model.js";
 import cloudinary from "../config/cloudinary.js";
 import { getReceiverSocketId, io } from "../app.js";
+
 export const getSideUsers = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -260,26 +261,50 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
     try {
-        const { text, image } = req.body;
+        const { text, image, voiceMessage } = req.body;  
         const { id: receiverId } = req.params;
         const senderId = req.user._id;
 
-        let imgurl = null;
+        let imageUrl = null;
+        let voiceMessageUrl = null;
+
+        // Upload image to Cloudinary
         if (image) {
-            const imgResponse = await cloudinary.uploader.upload(image);
-            imgurl = imgResponse.secure_url;
+            const imgResponse = await cloudinary.uploader.upload(image, {
+                folder: 'chat/images',
+            });
+            imageUrl = imgResponse.secure_url;
         }
 
-        const message = new Message({ senderId, receiverId, text, image: imgurl });
+        // Upload voice message to Cloudinary 
+        if (voiceMessage) {
+            const voiceResponse = await cloudinary.uploader.upload(voiceMessage, {
+                resource_type: 'video',    // Cloudinary handles audio as "video" or "raw"
+                folder: 'chat/voices',    
+            });
+            voiceMessageUrl = voiceResponse.secure_url;
+        }
+
+        const message = new Message({
+            senderId,
+            receiverId,
+            text,
+            image: imageUrl,
+            voiceMessage: voiceMessageUrl, 
+        });
+
         await message.save();
-        const ReceiverSocketId = getReceiverSocketId(receiverId)
-
+        const ReceiverSocketId = getReceiverSocketId(receiverId);
         if (ReceiverSocketId) {
-            io.to(ReceiverSocketId).emit("message",message)
+            io.to(ReceiverSocketId).emit("message", message);
         }
 
+        res.status(201).json({ 
+            success: true, 
+            message: "Message sent", 
+            data: message 
+        });
 
-        res.status(201).json({ success: true, message: "Message sent", data: message });
     } catch (error) {
         console.error("Error in sendMessage:", error.message);
         res.status(500).json({ error: "Internal server error" });

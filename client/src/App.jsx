@@ -7,7 +7,7 @@ import Chat from "./Chat.jsx";
 import { useAuthStore } from "./store/useAuthStore.js";
 import Test from "./Test.jsx";
 import Profile from "./Profile.jsx";
-
+import M from "./M.jsx";
 function App() {
     const { authUser, checkAuth, loading } = useAuthStore()
 
@@ -29,6 +29,7 @@ function App() {
 
         <Routes>
             <Route path="/" element={authUser ? <Test /> : <Navigate to="/login" />} />
+            <Route path="/m" element=<M /> />
             <Route path="/signup" element={!authUser ? <Signup /> : <Navigate to="/login" />} />
             <Route path="/login" element={!authUser ? <Login /> : <Navigate to="/" />} />
             {/* <Route path="/settings" element={<SettingsPage />} /> */}

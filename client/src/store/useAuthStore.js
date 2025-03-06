@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import axios from "axios";
-
+import { messAuth } from "./messageStore.js";
 axios.defaults.withCredentials = true;  // Global axios setting to always send cookies
 import { io } from 'socket.io-client'
 export const useAuthStore = create((set, get) => ({
@@ -11,6 +11,7 @@ export const useAuthStore = create((set, get) => ({
     loading: true,
     onlineusers: [],
     socket: null,
+    
 
     checkAuth: async () => {
         set({ loading: true });   // Start loading

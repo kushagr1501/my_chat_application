@@ -78,15 +78,17 @@ export const messAuth = create((set, get) => ({
         socket.off("message");
 
         socket.on("message", (message) => {
+            const { selectedUser, messages } = messAuth.getState();
             const isMessageForSelectedUser = (
                 (message.senderId === selectedUser._id && message.receiverId === useAuthStore.getState().authUser?._id) ||
                 (message.receiverId === selectedUser._id && message.senderId === useAuthStore.getState().authUser?._id)
             ); //vvip logic 
 
             if (isMessageForSelectedUser) {
-                set((state) => ({
-                    messages: [...state.messages, message]
-                }));
+                messAuth.setState({
+                    messages: [...messages, message]
+                });
+
             } else {
                 // console.log(`Message from ${message.senderId} ignored (not part of current chat)`);
             }

@@ -14,19 +14,54 @@ const Sidebar = () => {
         getBlockedUsers,
         unblockUser,
         pinnedChats,
-        getPinnedChats
+        getPinnedChats,
+        conversations = []
     } = messAuth();
 
-    const { authUser,onlineusers } = useAuthStore();
+    const { authUser, onlineusers } = useAuthStore();
     const [showBlockedUsers, setShowBlockedUsers] = useState(false);
 
     useEffect(() => {
         getusers();
         getBlockedUsers();
-        getPinnedChats();  
+        getPinnedChats();
     }, []);
 
-    console.log("online usrs are ",onlineusers);
+    // Filter users (remove blocked users from main list)
+    const filteredUsers = users.filter(
+        (user) => !blockedUsers.some((blocked) => blocked._id === user._id)
+    );
+
+    const isPinned = (userId) => pinnedChats.some(chat => chat._id === userId);
+    const isOnline = (userId) => onlineusers.includes(userId);
+
+    // Sort users based on pinned chats, recent conversations, and other users
+    const sortedUsers = () => {
+        // Pinned users always come first
+        const pinnedUsers = filteredUsers.filter(user => isPinned(user._id));
+
+        // Get users with recent conversations (not pinned)
+        const recentConversationUsers = conversations
+            .filter(conv => !isPinned(conv.participants[0]._id))
+            .map(conv => conv.participants[0])
+            .filter(user =>
+                filteredUsers.some(filteredUser => filteredUser._id === user._id)
+            );
+
+        // Remaining users (neither pinned nor in recent conversations)
+        const remainingUsers = filteredUsers.filter(
+            user =>
+                !isPinned(user._id) &&
+                !recentConversationUsers.some(recent => recent._id === user._id)
+        );
+
+        // Combine in the desired order: pinned, recent conversations, remaining
+        return [
+            ...pinnedUsers,
+            ...recentConversationUsers,
+            ...remainingUsers
+        ];
+    };
 
     const handleUnblock = async (userId) => {
         await unblockUser(userId);
@@ -34,18 +69,16 @@ const Sidebar = () => {
         alert("Unblocked successfully");
     };
 
-    const isPinned = (userId) => pinnedChats.some(chat => chat._id === userId);
-
-    // Filter users (remove blocked users from main list)
-    const filteredUsers = users.filter(
-        (user) => !blockedUsers.some((blocked) => blocked._id === user._id)
-    );
-
     return (
         <div className="w-1/4 h-screen bg-slate-50 border-r border-slate-200 flex flex-col">
             {/* Header */}
             <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center justify-between shadow-md">
-                <h1 className="text-xl font-bold">Chats</h1>
+                <div>
+                    <h1 className="text-xl font-bold">Chats</h1>
+                    <p className="text-sm text-indigo-100">
+                        {onlineusers.length} Online
+                    </p>
+                </div>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setShowBlockedUsers(!showBlockedUsers)}
@@ -72,8 +105,8 @@ const Sidebar = () => {
 
             {/* User List */}
             <ul className="divide-y divide-slate-100 overflow-y-auto flex-1">
-                {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
+                {sortedUsers().length > 0 ? (
+                    sortedUsers().map((user) => (
                         <li
                             key={user._id}
                             onClick={() => setselectedUser(user)}
@@ -95,10 +128,13 @@ const Sidebar = () => {
                                 <p className="font-medium text-slate-800 truncate">{user.username || user.name}</p>
                             </div>
 
-
                             <div className="text-xl">
                                 {isPinned(user._id) ? "📌" : "📍"}
                             </div>
+                            {isOnline(user._id) ? (
+                                <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                            ) : (
+                                <p className="text-gray-500 text-sm">Offline</p>)}
                         </li>
                     ))
                 ) : (
@@ -106,7 +142,7 @@ const Sidebar = () => {
                 )}
             </ul>
 
-            {/* Blocked Users Modal/List */}
+            {/* Blocked Users */}
             {showBlockedUsers && (
                 <div className="absolute top-0 left-1/4 w-1/4 h-screen bg-white shadow-lg border border-gray-300 p-4 z-10">
                     <h2 className="text-lg font-bold text-gray-700 mb-4">Blocked Users</h2>

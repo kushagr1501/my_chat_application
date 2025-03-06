@@ -1,12 +1,25 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useReactMediaRecorder } from 'react-media-recorder';
 import { messAuth } from './store/messageStore';
 
 function MessageInput() {
     const [text, setText] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
+    const [audioUrl, setAudioUrl] = useState(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [selectedVoiceEffect, setSelectedVoiceEffect] = useState('Normal'); // New state for voice effect
+
     const fileInputRef = useRef(null);
 
     const { sendMessage, selectedUser } = messAuth();
+
+    const { startRecording, stopRecording, mediaBlobUrl, clearBlobUrl } = useReactMediaRecorder({ audio: true });
+
+    useEffect(() => {
+        if (mediaBlobUrl) {
+            setAudioUrl(mediaBlobUrl);
+        }
+    }, [mediaBlobUrl]);
 
     const handleImageChange = (e) => {
         const file = e.target.files[0];
@@ -17,9 +30,8 @@ function MessageInput() {
             return;
         }
 
-        // Optional: File size limit check 
-        if (file.size > 10 * 1024 * 1024) { // 2MB
-            alert("File size exceeds 2MB limit.");
+        if (file.size > 10 * 1024 * 1024) {
+            alert("File size exceeds 10MB limit.");
             return;
         }
 
@@ -33,97 +45,167 @@ function MessageInput() {
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
-    const handleSendMessage = async (e) => {
-        e.preventDefault();  // Prevent form submission refresh
+    const removeAudio = () => {
+        setAudioUrl(null);
+        clearBlobUrl();
+        setSelectedVoiceEffect('Normal'); // Reset effect when audio removed
+    };
 
-        if (!text.trim() && !imagePreview) return;
+    const handleRecordingToggle = () => {
+        if (isRecording) {
+            stopRecording();
+            setIsRecording(false);
+        } else {
+            startRecording();
+            setIsRecording(true);
+        }
+    };
+
+    const getAudioBase64 = async () => {
+        if (!audioUrl) return null;
+        const response = await fetch(audioUrl);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    const handleEffectSelect = (effect) => {
+        setSelectedVoiceEffect(effect);
+    };
+
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+
+        if (!text.trim() && !imagePreview && !audioUrl) return;
 
         if (!selectedUser) {
             alert("No user selected. Please select a conversation first.");
             return;
         }
 
+        let voiceMessageBase64 = null;
+        if (audioUrl) {
+            voiceMessageBase64 = await getAudioBase64();
+        }
+
         try {
             await sendMessage({
                 text: text.trim(),
                 image: imagePreview,
-                receiverId: selectedUser._id,  // Pass the selectedUser's ID
+                voiceMessage: voiceMessageBase64,
+                voiceEffect: selectedVoiceEffect, // Send effect to backend
+                receiverId: selectedUser._id,
             });
 
-            // Clear input & image
             setText('');
+            setSelectedVoiceEffect('Normal'); // Reset after send
             removeImage();
+            removeAudio();
         } catch (error) {
             console.error("Failed to send message:", error);
         }
     };
 
+    const voiceEffects = ['Normal', 'Chipmunk', 'Demon', 'Robot', 'Walkie Talkie'];
+
     return (
         <div className="bg-gray-50 border-t border-gray-200 p-3">
-            {/* Image Preview */}
             {imagePreview && (
                 <div className="relative mb-2 inline-block">
-                    <img 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        className="h-20 rounded-md border border-gray-300" 
+                    <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="h-20 rounded-md border border-gray-300"
                     />
-                    <button 
+                    <button
                         onClick={removeImage}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        aria-label="Remove image"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        ✖️
                     </button>
                 </div>
             )}
 
-            {/* Input Form */}
+            {audioUrl && (
+                <div className="mb-2">
+                    <div className="flex items-center gap-2">
+                        <audio controls src={audioUrl} />
+                        <button
+                            onClick={removeAudio}
+                            className="bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                            ✖️
+                        </button>
+                    </div>
+
+                    {/* Voice Effect Selector */}
+                    <div className="flex gap-2 mt-2">
+                        {voiceEffects.map((effect) => (
+                            <button
+                                key={effect}
+                                className={`px-3 py-1 rounded-full text-sm font-medium cursor-pointer ${
+                                    selectedVoiceEffect === effect
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-200 text-gray-700'
+                                }`}
+                                onClick={() => handleEffectSelect(effect)}
+                            >
+                                {effect}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {isRecording && (
+                <div className="text-red-500 font-semibold mb-2">🎙️ Recording...</div>
+            )}
+
             <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                {/* Upload Button */}
-                <button 
+                <button
                     type="button"
                     className="text-gray-500 hover:text-gray-700"
                     onClick={() => fileInputRef.current.click()}
                     title="Attach image"
-                    aria-label="Attach image"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    📎
                 </button>
 
-                {/* Hidden File Input */}
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleImageChange} 
-                    className="hidden" 
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageChange}
+                    className="hidden"
                     accept="image/*"
                 />
 
-                {/* Text Input */}
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Type a message..." 
-                    className="flex-1 py-2 px-4 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Type a message..."
+                    className="flex-1 py-2 px-4 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
-                {/* Send Button */}
-                <button 
+                <button
+                    type="button"
+                    onClick={handleRecordingToggle}
+                    className={`text-white rounded-full p-2 ${isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-500 hover:bg-gray-700'}`}
+                    title={isRecording ? "Stop Recording" : "Start Recording"}
+                >
+                    {isRecording ? '⏹️' : '🎙️'}
+                </button>
+
+                <button
                     type="submit"
                     className="bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 disabled:opacity-50"
-                    disabled={!text.trim() && !imagePreview}
-                    title="Send message"
-                    aria-label="Send message"
+                    disabled={!text.trim() && !imagePreview && !audioUrl}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
+                    ➤
                 </button>
             </form>
         </div>

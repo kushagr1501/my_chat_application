@@ -50,6 +50,7 @@ io.on("connection", (socket) => {
     userSocketMap[userId] = socket.id;
     console.log(`User ${userId} connected with socket ${socket.id}`);
   }
+  
 
   io.emit("getOnlineUsers",Object.keys(userSocketMap))
 
